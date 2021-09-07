@@ -1,0 +1,173 @@
+-- База данных по обсадной трубе находящихся на месторождении около моего города Усинска.
+-- Решает задачу учета трубы на месторождениях.
+-- Суть в том что, вносятся данные типоразмеров труб: диаметров, стенок, марок стали, резьбовых соединений.
+-- Их очень много.
+-- Из этих данных собирается по id труба к которой прикрепляем вес в тоннах с 3 знаками после запятой.
+-- Потом вводим месторождение, и крепим к нему наименование трубы с весом.
+-- Итог можем знать какое количество трубы находится на месторождении.
+-- Правда сделал 8 таблиц из 10, но не стал придумывать абсолютно ненужные таблицы.
+
+drop database if exists storage;
+create database storage;
+
+use storage;
+
+drop table catalogs if exists;
+create table catalogs(
+id serial primary key,
+name varchar(255)
+) comment = 'название раздела'; 
+
+drop table if exists diameter_pipe;
+create table diameter_pipe(
+id serial primary key,
+diameter decimal (30,2) unsigned
+)comment = 'Диаметр трубы'
+
+
+drop table if exists wall_pipe;
+create table wall_pipe(
+id serial primary key,
+wall decimal (10,2) unsigned
+) comment = 'Толщина стенки';
+
+
+drop table if exists thread ;
+create table thread  (
+id serial primary key,
+thread tinytext comment 'вид резьбы'
+) comment = 'Резьба';
+
+drop table if exists steel_grade ;
+create table steel_grade  (
+id serial primary key,
+steel_grade VARCHAR(50) comment 'марка стали'
+) comment = 'сталь';
+
+drop table if exists pipe ;
+create table pipe  (
+id serial primary key,
+thread_id BIGINT UNSIGNED NOT NULL,
+diameter_pipe_id BIGINT UNSIGNED NOT NULL comment 'Диаметр',
+wall_pipe_id BIGINT UNSIGNED NOT NULL comment 'Толщина стенки',
+steel_grade_id BIGINT UNSIGNED NOT NULL comment 'марка стали',
+catalogs_id BIGINT UNSIGNED NOT null,
+foreign key (thread_id) references thread(id),
+foreign key (diameter_pipe_id) references diameter_pipe(id),
+foreign key (wall_pipe_id) references wall_pipe(id),
+foreign key (steel_grade_id) references steel_grade(id),
+foreign key (catalogs_id) references catalogs(id)
+) COMMENT = 'труба';
+
+drop table if exists weight_tn ;
+create table weight_tn  (
+id serial primary key,
+pipe_id BIGINT UNSIGNED NOT NULL COMMENT 'наименование трубы',
+weight_tn decimal (10,3) unsigned COMMENT 'масса трубы',
+foreign key (pipe_id) references pipe(id)
+) COMMENT = 'масса';
+
+drop table if exists field_oil;
+create table field_oil(
+id serial primary key,
+name varchar (255) comment 'название месторождения',
+weight_tn_id BIGINT UNSIGNED NOT null comment 'Вес и наименование трубы',
+foreign key (weight_tn_id) references weight_tn(id)
+);
+
+insert into catalogs values (null, 'Обсадные трубы');
+-- select * from catalogs; -- проверка вставки
+
+
+insert into diameter_pipe values
+(null, 178),
+(null, 244.48),
+(null, 323.9),
+(null, 426);
+
+-- select * from diameter_pipe; -- проверка вставки
+
+insert into wall_pipe values
+(null, 6.5),
+(null, 7.37),
+(null, 9.19),
+(null, 10.03);
+
+-- select * from wall_pipe; -- проверка вставки
+
+delete from thread; 
+insert into thread values
+(null, 'ОТТМ'), -- резьба ОТТМ по ГОСТ
+(null, 'БТС'), -- резьба Батресс по ГОСТ
+(null, 'ТМК'); -- резьба завода ТМК (запатентованная)
+
+
+-- select * from thread; -- проверка вставки
+
+-- ALTER TABLE thread AUTO_INCREMENT=0; --сбрасывал автоинкремент на ноль.
+
+insert into steel_grade values
+(null, 'Д'), -- марка стали Д по ГОСТ 
+(null, 'L-80'), -- марка стали по API
+(null, 'T-95'); -- марка стали по API
+
+-- select * from steel_grade; -- проверка вставки
+
+
+insert into pipe values
+(null, 1, 4, 4, 1, 1),
+(null, 1, 3, 3, 1, 1),
+(null, 2, 2, 2, 2, 1),
+(null, 3, 1, 1, 3, 1);
+
+-- select * from pipe; -- проверка вставки
+
+insert into weight_tn values
+(null, 1, 4.2),
+(null, 2, 30),
+(null, 3, 90.550),
+(null, 4, 65.398);
+
+-- select * from weight_tn; -- проверка вставки
+
+insert into field_oil values
+(null, 'Усинское', 1),
+(null, 'Усинское', 2),
+(null, 'Усинское', 3),
+(null, 'Усинское', 4);
+
+insert into field_oil values
+(null, 'Прохоровское', 1),
+(null, 'Прохоровское', 1),
+(null, 'Прохоровское', 2),
+(null, 'Прохоровское', 2),
+(null, 'Прохоровское', 4);
+
+insert into field_oil values
+(null, 'Баяндыское', 1),
+(null, 'Баяндыское', 2),
+(null, 'Баяндыское', 3),
+(null, 'Баяндыское', 4),
+(null, 'Баяндыское', 4);
+
+-- select * from field_oil; -- проверка вставки
+
+
+SELECT * FROM field_oil INNER JOIN thread, diameter_pipe, wall_pipe, steel_grade limit 10; -- join с ограничением в 10 строк
+
+/* SELECT fo.id , p.id  -- пытаюсь сгруппировать, но что то плохо получается.
+FROM field_oil fo, pipe p 
+WHERE fo.name = p.steel_grade_id 
+ORDER BY fo.name, p.id ; */
+
+SELECT * FROM
+  (SELECT * FROM pipe) thread; -- корявая вложеннаят таблица
+  
+CREATE VIEW v AS SELECT dp.id dp_id, wp.id wp_id FROM diameter_pipe dp , wall_pipe wp ; -- представление
+-- select * from v; -- проверка представления
+
+-- drop view pipe_view; -- сброс View, так как менял код 
+CREATE VIEW pipe_view AS SELECT p.id, t.thread, dp.diameter, wp.wall, sg.steel_grade
+FROM pipe p, thread t, diameter_pipe dp, wall_pipe wp, steel_grade sg limit 10; -- представление
+
+-- select * from pipe_view; -- проверка представления
